@@ -709,8 +709,9 @@ html.wide .mtop{padding-top:18px}
     L.sf.style.opacity=(t<.5?t*1.1:0).toFixed(3);
     L.sb.style.opacity=(t>.5?(1-t)*1.1:0).toFixed(3);
     L.el.style.zIndex=(a<-90)?(L.k+1):(n-L.k+1);
-    /* hide the face turned away from the reader: some browsers (Safari) ignore backface-visibility on pages with photo masks */
-    L.f.style.visibility=a<-90?'hidden':'visible';L.b.style.visibility=a<-90?'visible':'hidden';
+    /* remove the face turned away from the reader: some browsers ignore backface-visibility on pages with photos or masks */
+    var back=a<-90;
+    if(L.isBack!==back){L.isBack=back;L.f.style.display=back?'none':'';L.b.style.display=back?'':'none'}
   }
   function ease(p){return p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2}
   function anim(L,to,dur,delay){
