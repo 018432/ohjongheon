@@ -12,7 +12,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun 
 video{position:fixed;inset:0;width:100%;height:100%;height:100dvh;object-fit:contain;background:#0d1712;display:block}
 .btn{border:0;cursor:pointer;font:700 15px/1 inherit;font-family:inherit;border-radius:30px;padding:12px 18px;-webkit-tap-highlight-color:transparent;text-decoration:none;white-space:nowrap}
 #snd{position:fixed;z-index:5;right:12px;top:12px;background:rgba(255,255,255,.92);color:#143628;box-shadow:0 4px 14px rgba(0,0,0,.3);transition:opacity .4s,padding .3s}
-#snd.mini{opacity:.55;padding:9px 11px;font-size:16px}
 #end b{color:#bfe38a}
 #play{position:fixed;z-index:6;inset:0;margin:auto;width:96px;height:96px;border-radius:50%;background:rgba(255,255,255,.9);display:none;padding:0}
 #play:before{content:"";display:block;margin-left:36px;border-left:30px solid #1f5a40;border-top:18px solid transparent;border-bottom:18px solid transparent;width:0;height:0}
@@ -23,8 +22,8 @@ video{position:fixed;inset:0;width:100%;height:100%;height:100dvh;object-fit:con
 #end small{opacity:.7;font-size:13px}
 </style></head>
 <body>
-<video id="v" src="video.mp4" poster="poster.jpg" autoplay muted playsinline webkit-playsinline preload="auto"></video>
-<button class="btn" id="snd" type="button">🔊 소리 켜기</button>
+<video id="v" src="video.mp4" poster="poster.jpg" controls playsinline webkit-playsinline preload="auto" controlslist="nodownload noplaybackrate" disablepictureinpicture></video>
+<button class="btn" id="snd" type="button">🔊 눌러서 소리 켜기</button>
 <button class="btn" id="play" type="button" aria-label="재생"></button>
 <div id="end">
  <h2><b>기호 2번</b> 오종헌 · 최국록 · 박상민<br>2년의 약속, 공약집에서 확인하세요</h2>
@@ -36,27 +35,40 @@ video{position:fixed;inset:0;width:100%;height:100%;height:100dvh;object-fit:con
 (function(){
   var v=document.getElementById('v'),s=document.getElementById('snd'),pl=document.getElementById('play'),
       end=document.getElementById('end'),again=document.getElementById('again'),cd=document.getElementById('cd'),t=null,n=0;
-  function label(){s.textContent=v.muted?'🔊 소리 켜기':(s.classList.contains('mini')?'🔇':'🔇 소리 끄기')}
-  function tryPlay(){var p=v.play();if(p&&p.catch)p.catch(function(){pl.style.display='block'})}
-  /* 소리 버튼은 위쪽 빈 공간이 있으면 영상 밖에 표시 */
-  function place(){
-    var W=innerWidth,H=innerHeight,vw=v.videoWidth||720,vh=v.videoHeight||1280,
-        sc=Math.min(W/vw,H/vh),dh=vh*sc,gap=(H-dh)/2;
-    if(gap>=56){s.style.top=Math.max(8,(gap-44)/2)+'px'}else{s.style.top='12px'}
+  /* 주소 뒤에 ?t=30 처럼 붙이면 그 초부터 재생 */
+  var st=parseFloat((location.search.match(/[?&]t=(\d+(\.\d+)?)/)||[])[1]||0);
+  function label(){s.style.display=v.muted?'block':'none'}
+  function unmute(){v.muted=false;v.volume=1;var p=v.play();if(p&&p.catch)p.catch(function(){});label()}
+  /* 1) 소리 켠 채 자동재생 시도 → 2) 브라우저가 막으면 무음 자동재생 + 화면 아무 곳이나 누르면 소리 켜짐 */
+  function start(){
+    v.muted=false;
+    var p=v.play();
+    if(p&&p.catch){p.then(label).catch(function(){
+      v.muted=true;label();
+      var q=v.play();if(q&&q.catch)q.catch(function(){pl.style.display='block'});
+      var once=function(){unmute();removeEventListener('pointerdown',once,true);removeEventListener('keydown',once,true)};
+      addEventListener('pointerdown',once,true);addEventListener('keydown',once,true);
+    })}else label();
   }
-  function restart(){clearInterval(t);end.style.display='none';v.currentTime=0;tryPlay()}
+  function place(){
+    var W=innerWidth,H=innerHeight,vw=v.videoWidth||720,vh=v.videoHeight||1280,gap=(H-vh*Math.min(W/vw,H/vh))/2;
+    s.style.top=gap>=56?Math.max(8,(gap-44)/2)+'px':'12px';
+  }
+  function restart(){clearInterval(t);end.style.display='none';v.currentTime=0;v.play()}
   v.addEventListener('ended',function(){
-    pl.style.display="none";end.style.display="flex";n=8;cd.textContent=n+'초 뒤 영상이 다시 재생됩니다';
+    pl.style.display='none';end.style.display='flex';n=8;cd.textContent=n+'초 뒤 영상이 다시 재생됩니다';
     t=setInterval(function(){n--;cd.textContent=n+'초 뒤 영상이 다시 재생됩니다';if(n<=0)restart()},1000);
   });
+  /* 재생바로 시점을 옮기면 마지막 화면은 닫힘 */
+  v.addEventListener('seeking',function(){if(end.style.display==='flex'&&v.currentTime<v.duration-0.5){clearInterval(t);end.style.display='none'}});
   again.addEventListener('click',restart);
-  s.addEventListener('click',function(e){e.stopPropagation();v.muted=!v.muted;if(v.paused)tryPlay();
-    if(!v.muted)setTimeout(function(){s.classList.add('mini');label()},2500);else s.classList.remove('mini');label()});
-  pl.addEventListener('click',function(){pl.style.display='none';v.play()});
-  v.addEventListener('click',function(){if(v.paused){pl.style.display='none';v.play()}else{v.muted=!v.muted;label()}});
+  s.addEventListener('click',function(e){e.stopPropagation();unmute()});
+  pl.addEventListener('click',function(){pl.style.display='none';unmute()});
   v.addEventListener('playing',function(){pl.style.display='none'});
-  v.addEventListener('loadedmetadata',place);addEventListener('resize',place);
-  place();tryPlay();label();
+  v.addEventListener('volumechange',label);
+  v.addEventListener('loadedmetadata',function(){place();if(st>0&&st<v.duration)v.currentTime=st});
+  addEventListener('resize',place);
+  place();start();
 })();
 </script>
 </body></html>
